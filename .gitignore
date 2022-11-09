@@ -1,0 +1,3 @@
+.bundle/
+kafka/ksql/connectors/postgres-sink.json
+kafka/ksql/connectors/postgres-source.json

@@ -1,0 +1,25 @@
+{
+  "name": "postgres-source",
+  "config": {
+    "connector.class": "io.confluent.connect.jdbc.JdbcSourceConnector",
+    "connection.url": "jdbc:postgresql://postgres:${DB_PORT}/${DB_NAME}",
+    "connection.user": "${DB_USER}",
+    "connection.password": "${DB_PASSWORD}",
+    "mode": "incrementing",
+    "incrementing.column.name": "id",
+    "poll.interval.ms": "1000",
+    "topic.prefix": "postgres-",
+    "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "transforms": "createKey,extractInt,InsertTopic,InsertSourceDetails",
+    "transforms.createKey.type": "org.apache.kafka.connect.transforms.ValueToKey",
+    "transforms.createKey.fields": "id",
+    "transforms.extractInt.type": "org.apache.kafka.connect.transforms.ExtractField$Key",
+    "transforms.extractInt.field": "id",
+    "transforms.InsertTopic.type": "org.apache.kafka.connect.transforms.InsertField$Value",
+    "transforms.InsertTopic.topic.field": "messagetopic",
+    "transforms.InsertSourceDetails.type": "org.apache.kafka.connect.transforms.InsertField$Value",
+    "transforms.InsertSourceDetails.static.field": "messagesource",
+    "transforms.InsertSourceDetails.static.value": "postgresql"
+  }
+}

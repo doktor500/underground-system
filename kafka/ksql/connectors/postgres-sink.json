@@ -1,0 +1,21 @@
+{
+  "name": "postgres-sink",
+  "config": {
+    "connector.class": "io.confluent.connect.jdbc.JdbcSinkConnector",
+    "connection.url": "jdbc:postgresql://postgres:5432/db",
+    "connection.user": "postgres_user",
+    "connection.password": "postgres_password",
+    "topics": "TRIPS_AVERAGE_TIME",
+    "key.converter": "org.apache.kafka.connect.storage.StringConverter",
+    "value.converter": "io.confluent.connect.avro.AvroConverter",
+    "value.converter.schema.registry.url": "http://schema-registry:8081",
+    "key.converter.schemas.enable": "false",
+    "value.converter.schemas.enable": "true",
+    "auto.create": "true",
+    "dialect.name": "PostgreSqlDatabaseDialect",
+    "insert.mode": "upsert",
+    "delete.enabled": "true",
+    "pk.fields": "JOURNEY",
+    "pk.mode": "record_key"
+  }
+}

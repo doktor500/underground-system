@@ -1,0 +1,21 @@
+{
+  "name": "postgres-sink",
+  "config": {
+    "connector.class": "io.confluent.connect.jdbc.JdbcSinkConnector",
+    "connection.url": "jdbc:postgresql://postgres:${DB_PORT}/${DB_NAME}",
+    "connection.user": "${DB_USER}",
+    "connection.password": "${DB_PASSWORD}",
+    "topics": "${DB_STATS_TABLE}",
+    "key.converter": "org.apache.kafka.connect.storage.StringConverter",
+    "value.converter": "io.confluent.connect.avro.AvroConverter",
+    "value.converter.schema.registry.url": "http://schema-registry:8081",
+    "key.converter.schemas.enable": "false",
+    "value.converter.schemas.enable": "true",
+    "auto.create": "true",
+    "dialect.name": "PostgreSqlDatabaseDialect",
+    "insert.mode": "upsert",
+    "delete.enabled": "true",
+    "pk.fields": "${DB_STATS_TABLE_PK}",
+    "pk.mode": "record_key"
+  }
+}

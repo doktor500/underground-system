@@ -1,0 +1,144 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:15.0-bullseye
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - ./postgres/1-init.sql:/docker-entrypoint-initdb.d/1-init.sql
+    healthcheck:
+      test: pg_isready -U ${DB_USER} -d ${DB_NAME}
+    ports:
+      - 5432:5432
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.3.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+    healthcheck:
+      test: nc -z localhost 2181
+    ports:
+      - 2181:2181
+
+  kafka:
+    image: confluentinc/cp-kafka:7.3.0
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    environment:
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_BROKER_ID: 1
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_ADVERTISED_HOST_NAME: kafka
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+    healthcheck:
+      test: kafka-topics --list --bootstrap-server localhost:9092
+    ports:
+      - 9092:9092
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.3.0
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      SCHEMA_REGISTRY_KAFKASTORE_CONNECTION_URL: zookeeper:2181
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:9092
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_LISTENERS: http://schema-registry:8081,http://localhost:8081
+    healthcheck:
+      test: nc -z localhost 8081
+    hostname: schema-registry
+    ports:
+      - 8081:8081
+
+  ksql-server:
+    image: confluentinc/cp-ksql-server:5.4.10
+    platform: linux/amd64
+    depends_on:
+      kafka:
+        condition: service_healthy
+      schema-registry:
+        condition: service_healthy
+    environment:
+      KSQL_BOOTSTRAP_SERVERS: kafka:9092
+      KSQL_KSQL_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      KSQL_LISTENERS: http://0.0.0.0:8088
+      KSQL_KSQL_SERVICE_ID: ksql-server
+    healthcheck:
+      test: nc -z localhost 8088
+    hostname: ksql-server
+    ports:
+      - 8088:8088
+
+  kafka-connect:
+    image: confluentinc/cp-kafka-connect:7.3.0
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      CONNECT_BOOTSTRAP_SERVERS: kafka:9092
+      CONNECT_REST_PORT: 8083
+      CONNECT_GROUP_ID: connect-group
+      CONNECT_CONFIG_STORAGE_TOPIC: connect-configs
+      CONNECT_OFFSET_STORAGE_TOPIC: connect-offsets
+      CONNECT_STATUS_STORAGE_TOPIC: connect-status
+      CONNECT_KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_INTERNAL_KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_INTERNAL_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_REST_ADVERTISED_HOST_NAME: kafka-connect
+      CONNECT_PLUGIN_PATH: /usr/share/java/kafka-connect-jdbc
+      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_CONFLUENT_TOPIC_REPLICATION_FACTOR: 1
+    volumes:
+      - ./kafka/connect/plugins:/usr/share/java/kafka-connect-jdbc
+      - ./kafka/connect/drivers:/etc/kafka-connect/jars
+    healthcheck:
+      test: curl --fail http://localhost:8083
+    hostname: kafka-connect
+    ports:
+      - 8083:8083
+
+  kafka-connect-config:
+    image: curlimages/curl:7.86.0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ksql-server:
+        condition: service_healthy
+      kafka-connect:
+        condition: service_healthy
+    volumes:
+      - ./kafka/ksql/connectors:/connectors
+    entrypoint: ['/bin/sh', '-c']
+    command: |
+      '
+      curl -X POST -H "Content-Type: application/json" http://kafka-connect:8083/connectors --data @connectors/postgres-source.json;
+      curl -X POST -H "Content-Type: application/json" http://kafka-connect:8083/connectors --data @connectors/postgres-sink.json;
+      '
+
+  ksql-cli:
+    image: confluentinc/cp-ksql-cli:5.4.10
+    platform: linux/amd64
+    depends_on:
+      ksql-server:
+        condition: service_healthy
+      kafka-connect:
+        condition: service_healthy
+      kafka-connect-config:
+        condition: service_completed_successfully
+    volumes:
+      - ./kafka/ksql/queries:/opt/local/kafka/ksql/queries
+    entrypoint: ['/bin/bash', '-c']
+    command: |
+      '
+      cat /opt/local/kafka/ksql/queries/trips.sql | ksql http://ksql-server:8088
+      '
