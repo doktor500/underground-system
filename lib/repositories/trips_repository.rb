@@ -47,11 +47,11 @@ class TripsRepository
     results.to_a.map { |trip| to_trip(trip) }
   end
 
-  def execute_query(query)
+  def execute_query(args)
     connection = PG::Connection.new(@db_config)
-    connection.exec(query)
-  rescue PG::Error => e
-    puts e.message
+    connection.exec_params(args[:query], args[:params])
+  rescue PG::Error => error
+    puts error.message
   ensure
     connection&.close
   end

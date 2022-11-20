@@ -19,11 +19,11 @@ class Trip
   end
 
   def end_time
-    @end.time
+    @end&.time
   end
 
   def end_station
-    @end.station
+    @end&.station
   end
 
   def time
