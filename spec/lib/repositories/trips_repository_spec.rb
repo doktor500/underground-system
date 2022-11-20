@@ -5,7 +5,7 @@ require './lib/repositories/trips_repository'
 
 RSpec.describe 'trips repository' do
   let(:user_id) { rand(1..100_000) }
-  let(:trips_repository) { ENV['test'] == 'integration' ? TripsRepository.new : FakeTripsRepository.new }
+  let(:trips_repository) { ENV['profile'] == 'integration' ? TripsRepository.new : FakeTripsRepository.new }
 
   it 'returns the last non completed trip of a user' do
     trips_repository.save(create_completed_trip(user_id, 'Waterloo', 'Cambridge'))
